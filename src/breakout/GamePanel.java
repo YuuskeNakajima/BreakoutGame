@@ -8,6 +8,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
+import java.awt.CardLayout;
 
 public class GamePanel extends JPanel implements KeyListener {
     private Ball ball;
@@ -20,7 +21,15 @@ public class GamePanel extends JPanel implements KeyListener {
     private String message = null;
     private boolean showMessage = false;
 
-    public GamePanel() {
+    private CardLayout layout;
+    private JPanel parent;
+
+    private int bounceCount = 0;
+
+    public GamePanel(CardLayout layout, JPanel parent) {
+        this.layout = layout;
+        this.parent = parent;
+
         setPreferredSize(new Dimension(400, 300));
         setBackground(Color.BLACK);
         setLayout(null); // ボタンの位置を自由に設定するため
@@ -30,7 +39,6 @@ public class GamePanel extends JPanel implements KeyListener {
         setFocusable(true);
         addKeyListener(this);
         setFocusable(true);
-        addKeyListener(this);
 
         timer = new Timer(16, e -> {
 
@@ -58,16 +66,27 @@ public class GamePanel extends JPanel implements KeyListener {
             if (ball.getBounds().intersects(paddle.getBounds())) {
                 ball.reverseY();
                 ball.setY(paddle.getY() - ball.getradius()); // めり込み防止
+                bounceCount++;
+
+                // 3回跳ね返したらクリア(仮)
+                if (bounceCount >= 3) {
+                    timer.stop();
+                    layout.show(parent, "Clear");
+                    return; // 以降の処理を止める
+                }
             }
 
             // ゲームオーバー判定：画面の下に出たら終了
             if (ball.getY() >= getHeight()) {
                 timer.stop(); // ゲーム停止
-                int option = JOptionPane.showConfirmDialog(
-                        this,
-                        "Game Over\nもう一度プレイしますか？",
-                        "ゲームオーバー",
-                        JOptionPane.YES_NO_OPTION);
+                String[] options = { "もう一度(Enter)", "終了(ESC)" };
+                int option = JOptionPane.showOptionDialog(
+                        this, "ゲームオーバー\nもう一度？", "Game Over",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.INFORMATION_MESSAGE,
+                        null,
+                        options,
+                        options[0]);
 
                 if (option == JOptionPane.YES_OPTION) {
                     // 入力状態リセット（❷）
@@ -95,14 +114,27 @@ public class GamePanel extends JPanel implements KeyListener {
                     System.exit(0); // 終了
                 }
             }
-
             repaint(); // 描画
         });
-        timer.start();
     }
 
     public void startGame() {
         requestFocusInWindow();
+        ball = new Ball(100, 100);
+        paddle = new Paddle(160, 260, 400);
+        leftPressed = false;
+        rightPressed = false;
+        bounceCount = 0; // ← 忘れずにリセット
+        repaint();
+        timer.start();
+    }
+
+    public void resetGame() {
+        ball = new Ball(100, 100);
+        paddle = new Paddle(160, 260, 400);
+        leftPressed = false;
+        rightPressed = false;
+        repaint();
         timer.start();
     }
 

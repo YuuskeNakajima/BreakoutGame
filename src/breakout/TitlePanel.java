@@ -13,7 +13,7 @@ public class TitlePanel extends JPanel {
         title.setFont(new Font("SansSerif", Font.BOLD, 24));
         add(title, BorderLayout.CENTER);
 
-        this.startButton = new JButton("スタート");
+        this.startButton = new JButton("スタート(Enter)");
         add(startButton, BorderLayout.SOUTH);
 
         startButton.addActionListener(e -> {
