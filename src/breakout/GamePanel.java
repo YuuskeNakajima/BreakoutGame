@@ -5,6 +5,7 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 import java.awt.Graphics;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Dimension;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
@@ -25,6 +26,8 @@ public class GamePanel extends JPanel implements KeyListener {
     private JPanel parent;
 
     private int bounceCount = 0;
+    private boolean isPaused = false;
+    private boolean gameStarted = false;
 
     public GamePanel(CardLayout layout, JPanel parent) {
         this.layout = layout;
@@ -38,9 +41,10 @@ public class GamePanel extends JPanel implements KeyListener {
         paddle = new Paddle(160, 260, 400); // 例：x=160, y=260
         setFocusable(true);
         addKeyListener(this);
-        setFocusable(true);
 
         timer = new Timer(16, e -> {
+            if (isPaused)
+                return;
 
             // ボール移動
             ball.move();
@@ -57,7 +61,6 @@ public class GamePanel extends JPanel implements KeyListener {
             if (ball.getX() <= 0 || ball.getX() >= getWidth() - ball.getradius()) {
                 ball.reverseX();
             }
-
             if (ball.getY() <= 0) {
                 ball.reverseY();
             }
@@ -88,7 +91,7 @@ public class GamePanel extends JPanel implements KeyListener {
                         options,
                         options[0]);
 
-                if (option == JOptionPane.YES_OPTION) {
+                if (option == 0) {
                     // 入力状態リセット（❷）
                     leftPressed = false;
                     rightPressed = false;
@@ -106,7 +109,7 @@ public class GamePanel extends JPanel implements KeyListener {
                     Timer restartTimer = new Timer(1000, ev -> {
                         showMessage = false; // メッセージ非表示
                         message = null;
-                        timer.start();
+                        resetGame(); // ゲームをリセット
                     });
                     restartTimer.setRepeats(false); // 一度だけ実行
                     restartTimer.start();
@@ -119,23 +122,20 @@ public class GamePanel extends JPanel implements KeyListener {
     }
 
     public void startGame() {
-        requestFocusInWindow();
-        ball = new Ball(100, 100);
-        paddle = new Paddle(160, 260, 400);
-        leftPressed = false;
-        rightPressed = false;
-        bounceCount = 0; // ← 忘れずにリセット
-        repaint();
+        resetGame();
+        gameStarted = true;
         timer.start();
+        requestFocusInWindow();
     }
 
     public void resetGame() {
+        requestFocusInWindow();
         ball = new Ball(100, 100);
         paddle = new Paddle(160, 260, 400);
+        bounceCount = 0;
         leftPressed = false;
         rightPressed = false;
         repaint();
-        timer.start();
     }
 
     @Override
@@ -143,24 +143,45 @@ public class GamePanel extends JPanel implements KeyListener {
         super.paintComponent(g);
         paddle.draw(g);
         ball.draw(g);
+
+        g.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        g.setColor(Color.WHITE);
+
         if (showMessage && message != null) {
-            g.setColor(Color.WHITE);
             g.drawString(message, getWidth() / 2 - 50, 20);
+        }
+
+        // ポーズ状態の表示
+        if (isPaused) {
+            g.drawString("PAUSED", getWidth() / 2 - 50, 40);
+        } else {
+            g.drawString("Pでポーズ", getWidth() / 2 - 50, 40);
         }
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
         int key = e.getKeyCode();
-        if (key == KeyEvent.VK_LEFT) {
-            leftPressed = true;
-        } else if (key == KeyEvent.VK_RIGHT) {
-            rightPressed = true;
+        if (gameStarted && key == KeyEvent.VK_P) {
+            isPaused = !isPaused;
+            repaint();
+            return; // Pキー以外の入力は無視
+        }
+
+        if (!isPaused) {
+            if (key == KeyEvent.VK_LEFT) {
+                leftPressed = true;
+            } else if (key == KeyEvent.VK_RIGHT) {
+                rightPressed = true;
+            }
+            repaint(); // 表示を更新
         }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
+        if (isPaused) return;
+
         int key = e.getKeyCode();
         if (key == KeyEvent.VK_LEFT) {
             leftPressed = false;
@@ -171,6 +192,7 @@ public class GamePanel extends JPanel implements KeyListener {
 
     @Override
     public void keyTyped(KeyEvent e) {
-
+        // キータイプイベントは使用しないので空実装
     }
+
 }
