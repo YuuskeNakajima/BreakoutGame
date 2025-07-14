@@ -4,12 +4,55 @@ import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Rectangle;
 
-public class Paddle {
+public class Paddle implements GameObject, Movable, Collidable {
     private int x, y;
     private final int width;
     private final int height;
     private int speed;
     private final int gameWidth; // パネルの横幅
+
+    // キー入力状態
+    private boolean moveLeft = false;
+    private boolean moveRight = false;
+
+    @Override
+    public void update() {
+        if (moveLeft && x - speed >= 0) {
+            x -= speed;
+        }
+        if (moveRight && x + speed <= gameWidth - width) {
+            x += speed;
+        }
+    }
+
+    public void setMoveLeft(boolean move) {
+        this.moveLeft = move;
+    }
+
+    public void setMoveRight(boolean move) {
+        this.moveRight = move;
+    }
+
+    @Override
+    public boolean isActive() {
+        return true; // パドルは常にアクティブ
+    }
+
+    @Override
+    public Rectangle getBounds() {
+        return new Rectangle(x, y, width, height);
+    }
+
+    @Override
+    public void draw(Graphics g) {
+        g.setColor(Color.BLUE);
+        g.fillRect(x, y, width, height);
+    }
+
+    @Override
+    public void onCollision(GameObject other) {
+        // Paddle では受け身のまま空実装
+    }
 
     public Paddle(int startX, int startY, int gameWidth) {
         this.x = startX;
@@ -30,15 +73,6 @@ public class Paddle {
         if (x + speed <= gameWidth - width) {
             x += speed;
         }
-    }
-
-    public void draw(Graphics g) {
-        g.setColor(Color.BLUE);
-        g.fillRect(x, y, width, height);
-    }
-
-    public Rectangle getBounds() {
-        return new Rectangle(x, y, width, height);
     }
 
     // ゲッター・セッター
@@ -74,4 +108,13 @@ public class Paddle {
     public int getSpeed() {
         return speed;
     }
+
+    public boolean isMovingLeft() {
+        return moveLeft;
+    }
+
+    public boolean isMovingRight() {
+        return moveRight;
+    }
+
 }
