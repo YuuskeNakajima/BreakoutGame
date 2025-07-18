@@ -1,7 +1,10 @@
 package breakout;
 
+import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import java.awt.Graphics;
 import java.awt.Color;
@@ -21,6 +24,9 @@ public class GamePanel extends JPanel implements KeyListener {
     private static final int INITIAL_BALL_Y = 160;
 
     private String message = null;
+    private int score = 0;
+    private double initialBallSpeed = 5.0;
+    private JLabel speedUpLabel;
 
     private CardLayout layout;
     private JPanel parent;
@@ -37,10 +43,10 @@ public class GamePanel extends JPanel implements KeyListener {
         setBackground(Color.BLACK);
         setLayout(null); // ボタンの位置を自由に設定するため
 
-        ball = new Ball(INITIAL_BALL_X, INITIAL_BALL_Y);
-        paddle = new Paddle(160, 260, 400); // 例：x=160, y=260
         setFocusable(true);
         addKeyListener(this);
+
+        setupSpeedUpLabel();
 
         timer = new Timer(16, e -> {
             if (!stateManager.is(GameState.RUNNING))
@@ -96,15 +102,25 @@ public class GamePanel extends JPanel implements KeyListener {
     public void startGame() {
         resetGame();
         stateManager.transitionTo(GameState.READY);
-        requestFocusInWindow();
+        SwingUtilities.invokeLater(() -> requestFocusInWindow());
+    }
+
+    public void startGame(double speed) {
+        this.initialBallSpeed = speed;
+        startGame(); // 通常のスタート処理へ
     }
 
     public void resetGame() {
         timer.stop();
         blocks = new ArrayList<>(BlockManager.createStage(1));
         requestFocusInWindow();
-        ball = new Ball(INITIAL_BALL_X, INITIAL_BALL_Y); // 安全な位置（中央より下側）に置く
+        // 安全な位置（中央より下側）に置く
+        ball = new Ball((double) INITIAL_BALL_X, (double) INITIAL_BALL_Y, initialBallSpeed);
+        // スコア加算用のラムダ式を設定
+        ball.setScoreConsumer(points -> score += points);
+        ball.setSpeedChangeListener(() -> showSpeedUpNotice());
         paddle = new Paddle(160, 260, 400);
+        score = 0;
 
         gameObjects = new ArrayList<>();
         gameObjects.addAll(blocks);
@@ -119,9 +135,29 @@ public class GamePanel extends JPanel implements KeyListener {
         repaint();
     }
 
+    private void setupSpeedUpLabel() {
+        speedUpLabel = new JLabel("スピードアップ！", SwingConstants.CENTER);
+        speedUpLabel.setForeground(Color.YELLOW);
+        speedUpLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        speedUpLabel.setVisible(false);
+        speedUpLabel.setBounds(100, 10, 200, 30);
+        this.add(speedUpLabel);
+    }
+
+    public void showSpeedUpNotice() {
+        speedUpLabel.setVisible(true);
+        Timer timer = new Timer(1000, e -> speedUpLabel.setVisible(false));
+        timer.setRepeats(false);
+        timer.start();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+
+        g.setColor(Color.YELLOW);
+        g.setFont(new Font("SansSerif", Font.BOLD, 14));
+        g.drawString("SCORE: " + score, 20, 20);
 
         if (stateManager.is(GameState.READY) || stateManager.is(GameState.GAMEOVER)) {
             g.setColor(Color.WHITE);
@@ -200,5 +236,4 @@ public class GamePanel extends JPanel implements KeyListener {
     public void keyTyped(KeyEvent e) {
         // キータイプイベントは使用しないので空実装
     }
-
 }

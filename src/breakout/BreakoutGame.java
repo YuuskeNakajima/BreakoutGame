@@ -3,13 +3,13 @@ package breakout;
 import javax.swing.*;
 import java.awt.*;
 
-public class BreakoutGame{
-    public static void main(String[] args) { 
+public class BreakoutGame {
+    public static void main(String[] args) {
         JFrame frame = new JFrame("Breakout");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         CardLayout cardLayout = new CardLayout();
         JPanel mainPanel = new JPanel(cardLayout);
-        GamePanel gamePanel = new GamePanel(cardLayout, mainPanel);     
+        GamePanel gamePanel = new GamePanel(cardLayout, mainPanel);
         TitlePanel titlePanel = new TitlePanel(cardLayout, mainPanel);
         ClearPanel clearPanel = new ClearPanel(cardLayout, mainPanel, gamePanel);
 
@@ -31,8 +31,7 @@ public class BreakoutGame{
 
         // スタートボタンにフォーカスを与える
         SwingUtilities.invokeLater(() -> {
-        titlePanel.getStartButton().requestFocusInWindow();
-    });
+            titlePanel.requestSliderFocus(); // ここでスライダーに明示的にフォーカスを渡す
+        });
     }
 }
-

@@ -2,15 +2,22 @@ package breakout;
 
 import java.awt.Color;
 import java.awt.Rectangle;
+import java.util.function.Consumer;
 import java.awt.Graphics;
 
 public class Ball implements GameObject, Movable, Collidable {
 
-    private int x, y;
-    private int dx = 2, dy = 3;// 移動速度
+    private double x, y;
+    private double dx = 2, dy = 3;// 移動速度
+    private double initialSpeed;
     final int radius = 10;
-    private int prevX, prevY;
+    private double prevX, prevY;
     private int bounceCount = 0;
+    private Consumer<Integer> scoreConsumer = s -> {
+    }; // デフォルトは何もしない
+
+    // Ball クラスに listener 登録機能
+    private SpeedChangeListener speedChangeListener;
 
     @Override
     public void onCollision(GameObject other) {
@@ -18,12 +25,40 @@ public class Ball implements GameObject, Movable, Collidable {
             Rectangle ballRect = getBounds();
             Rectangle paddleRect = paddle.getBounds();
             // 前の位置より下から上に衝突したときだけ反転
-            if (ballRect.intersects(paddleRect) && prevY + radius * 2 <= paddle.getY()) {
-                reverseY();
+            if (dy > 0 && (ballRect.intersects(paddleRect) ||
+                    (prevY + radius * 2 <= paddle.getY() && y + radius * 2 >= paddle.getY()))) {
+                // reverseY();
+
+                // パドル中央との相対距離（-1.0〜1.0の範囲）
+                double paddleCenter = paddle.getX() + paddle.getWidth() / 2.0;
+                double ballCenter = getX() + getRadius();
+                double relativeIntersect = (ballCenter - paddleCenter) / (paddle.getWidth() / 2.0);
+                relativeIntersect = Math.max(-1.0, Math.min(1.0, relativeIntersect)); // 安全な範囲に制限
+
+                double angle = Math.toRadians(relativeIntersect * 45);
+
+                if (Math.abs(relativeIntersect) < 0.05) {
+                    angle = Math.toRadians(dx > 0 ? -5 : 5);
+                }
+
+                // 来た方向によって反射角の符号を調整（反対向きに返す）
+                if (dx > 0 && relativeIntersect < 0) {
+                    angle = -angle; // 右から来て左に当たった → 右に返す
+                } else if (dx < 0 && relativeIntersect > 0) {
+                    angle = -angle; // 左から来て右に当たった → 左に返す
+                }
+
+                double speed = this.initialSpeed; // ← startGame から渡された値
+                dx = speed * Math.sin(angle);
+                dy = -speed * Math.cos(angle);
+
+                if (Math.abs(dx) < 0.3) {
+                    dx = dx < 0 ? -0.3 : 0.3;
+                }
+
                 setY(paddle.getY() - radius); // パドル上に配置してめり込み防止
                 bounceCount++;
             }
-
 
         } else if (other instanceof Block block) {
             if (!block.isDestroyed()) {
@@ -31,6 +66,7 @@ public class Ball implements GameObject, Movable, Collidable {
                 Rectangle blockRect = block.getBounds();
 
                 block.destroy();
+                scoreConsumer.accept(100); // スコア加算
 
                 int ballBottom = ballRect.y + ballRect.height;
                 int ballTop = ballRect.y;
@@ -65,17 +101,30 @@ public class Ball implements GameObject, Movable, Collidable {
         prevY = y;
         x += dx;
         y += dy;
+
+        // ボール反射数に応じてスピードを増加（5の倍数、最大20回まで）
+        int bounce = getBounceCount();
+        if (bounce > 0 && bounce % 5 == 0 && bounce <= 20) {
+            double multiplier = 1.0 + (bounce / 5) * 0.1; // 5回で+0.1ずつ → 最大1.4倍（超える場合も考慮）
+            if (multiplier > 1.2)
+                multiplier = 1.2; // 上限制限
+            normalizeSpeed(multiplier);
+
+            if (speedChangeListener != null) {
+                speedChangeListener.onSpeedUp();
+            }
+        }
     }
 
     @Override
     public void draw(Graphics g) {
         g.setColor(Color.WHITE);
-        g.fillOval(x, y, radius * 2, radius * 2);
+        g.fillOval((int) x, (int) y, radius * 2, radius * 2);
     }
 
     @Override
     public Rectangle getBounds() {
-        return new Rectangle(x, y, radius * 2, radius * 2);
+        return new Rectangle((int) x, (int) y, radius * 2, radius * 2);
     }
 
     @Override
@@ -83,9 +132,16 @@ public class Ball implements GameObject, Movable, Collidable {
         return true;
     }
 
-    public Ball(int startX, int startY) {
+    public Ball(double startX, double startY, double speed) {
         this.x = startX;
         this.y = startY;
+        this.initialSpeed = speed;
+        this.dx = 0;
+        this.dy = speed;
+    }
+
+    public Ball(double startX, double startY) {
+        this(startX, startY, 5.0);
     }
 
     public int getBounceCount() {
@@ -104,32 +160,43 @@ public class Ball implements GameObject, Movable, Collidable {
         dy = -dy;
     }
 
+    private void normalizeSpeed(double multiplier) {
+        double speed = Math.sqrt(dx * dx + dy * dy);
+        double targetSpeed = this.initialSpeed * multiplier;
+
+        if (speed == 0)
+            return;
+
+        dx = dx / speed * targetSpeed;
+        dy = dy / speed * targetSpeed;
+    }
+
     // 位置情報
     public int getX() {
-        return x;
+        return (int) x;
     }
 
     public int getY() {
-        return y;
+        return (int) y;
     }
 
     public int getRightX() {
-        return x + radius;
+        return (int) (x + radius * 2);
     }
 
     public int getCenterX() {
-        return x + radius / 2;
+        return (int) (x + radius);
     }
 
     public int getCenterY() {
-        return y + radius / 2;
+        return (int) (y + radius);
     }
 
-    public void setX(int x) {
+    public void setX(double x) {
         this.x = x;
     }
 
-    public void setY(int y) {
+    public void setY(double y) {
         this.y = y;
     }
 
@@ -142,19 +209,19 @@ public class Ball implements GameObject, Movable, Collidable {
     }
 
     // 移動速度（オプション）
-    public void setDx(int dx) {
+    public void setDx(double dx) {
         this.dx = dx;
     }
 
-    public void setDy(int dy) {
+    public void setDy(double dy) {
         this.dy = dy;
     }
 
-    public int getDx() {
+    public double getDx() {
         return dx;
     }
 
-    public int getDy() {
+    public double getDy() {
         return dy;
     }
 
@@ -163,6 +230,15 @@ public class Ball implements GameObject, Movable, Collidable {
     }
 
     public int getBottom() {
-        return y + radius * 2;
+        return (int) y + radius * 2;
     }
+
+    public void setScoreConsumer(Consumer<Integer> consumer) {
+        this.scoreConsumer = consumer;
+    }
+
+    public void setSpeedChangeListener(SpeedChangeListener listener) {
+        this.speedChangeListener = listener;
+    }
+
 }
