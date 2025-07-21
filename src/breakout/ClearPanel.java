@@ -5,7 +5,16 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 
 public class ClearPanel extends JPanel {
-    public ClearPanel(CardLayout layout, JPanel parent, GamePanel gamePanel) {
+
+    private final CardLayout layout;
+    private final JPanel     parent;
+    private JLabel scoreLabel;
+    private GamePanel gamePanel;
+
+    public ClearPanel(CardLayout layout, JPanel parent, GamePanel gp) {
+        this.layout = layout;
+        this.parent = parent;
+        this.gamePanel = gp;
         setLayout(new BorderLayout());
 
         JLabel message = new JLabel("🎉 ゲームクリア！", SwingConstants.CENTER);
@@ -20,12 +29,19 @@ public class ClearPanel extends JPanel {
         buttonPanel.add(exitButton);
         add(buttonPanel, BorderLayout.SOUTH);
 
+        scoreLabel = new JLabel("スコア: " + GameManager.getTotalScore(), SwingConstants.CENTER);
+        scoreLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+        scoreLabel.setForeground(Color.black);
+        scoreLabel.setBounds(100, 100, 200, 50);
+        add(scoreLabel, BorderLayout.NORTH);
+
         // ---- ボタンアクション ----
         retryButton.addActionListener(e -> {
-            gamePanel.resetGame(); // ゲームパネルを初期状態に戻す
             layout.show(parent, "Game");
-            gamePanel.startGame(); // ゲーム再開
-            gamePanel.requestFocusInWindow();
+            if (gamePanel != null) {
+                gamePanel.startGame(); // ゲーム再開
+                gamePanel.requestFocusInWindow();
+            }
         });
 
         exitButton.addActionListener(e -> System.exit(0));
@@ -46,7 +62,16 @@ public class ClearPanel extends JPanel {
             @Override
             public void actionPerformed(ActionEvent e) {
                 exitButton.doClick();
+                GameManager.resetScore();
             }
         });
+    }
+
+    public void setGamePanel(GamePanel gp) {
+        this.gamePanel = gp;
+    }
+
+    public void updateScoreLabel() {
+        scoreLabel.setText("スコア: " + GameManager.getTotalScore());
     }
 }

@@ -9,12 +9,14 @@ public class BreakoutGame {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         CardLayout cardLayout = new CardLayout();
         JPanel mainPanel = new JPanel(cardLayout);
-        GamePanel gamePanel = new GamePanel(cardLayout, mainPanel);
+        ClearPanel clearPanel = new ClearPanel(cardLayout, mainPanel, null);
+        GamePanel gamePanel = new GamePanel(cardLayout, mainPanel, clearPanel);
+        clearPanel.setGamePanel(gamePanel);
         TitlePanel titlePanel = new TitlePanel(cardLayout, mainPanel);
-        ClearPanel clearPanel = new ClearPanel(cardLayout, mainPanel, gamePanel);
 
         mainPanel.add(titlePanel, "Title");
         mainPanel.add(gamePanel, "Game");
+        mainPanel.add(clearPanel, "Clear");
 
         frame.setResizable(false);
         frame.add(mainPanel);
@@ -22,12 +24,8 @@ public class BreakoutGame {
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
         frame.getRootPane().setDefaultButton(titlePanel.getStartButton());
-
-        // 最初にタイトル画面を表示
+       
         cardLayout.show(mainPanel, "Title");
-
-        // ゲームクリアパネルを追加
-        mainPanel.add(clearPanel, "Clear");
 
         // スタートボタンにフォーカスを与える
         SwingUtilities.invokeLater(() -> {

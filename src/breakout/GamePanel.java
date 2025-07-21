@@ -24,20 +24,21 @@ public class GamePanel extends JPanel implements KeyListener {
     private static final int INITIAL_BALL_Y = 160;
 
     private String message = null;
-    private int score = 0;
     private double initialBallSpeed = 5.0;
     private JLabel speedUpLabel;
 
     private CardLayout layout;
     private JPanel parent;
+    private ClearPanel clearPanel;
 
     private GameStateManager stateManager = new GameStateManager();
     private List<Block> blocks;
     private List<GameObject> gameObjects;
 
-    public GamePanel(CardLayout layout, JPanel parent) {
+    public GamePanel(CardLayout layout, JPanel parent, ClearPanel clearPanel) {
         this.layout = layout;
         this.parent = parent;
+        this.clearPanel = clearPanel;
 
         setPreferredSize(new Dimension(400, 300));
         setBackground(Color.BLACK);
@@ -49,59 +50,77 @@ public class GamePanel extends JPanel implements KeyListener {
         setupSpeedUpLabel();
 
         timer = new Timer(16, e -> {
-            if (!stateManager.is(GameState.RUNNING))
+            if (!stateManager.is(GameState.RUNNING)) {
                 return;
+            }
 
-            // 移動
-            for (GameObject obj : gameObjects) {
-                if (obj instanceof Movable m) {
-                    m.update();
+            if (clearPanel != null) {
+                clearPanel.updateScoreLabel();
+            }
+
+            try {
+                // 移動
+                for (GameObject obj : gameObjects) {
+                    if (obj instanceof Movable m) {
+                        m.update();
+                    }
                 }
-            }
-            // 衝突判定
-            CollisionManager.handleCollisions(ball, gameObjects);
+                // 衝突判定
+                CollisionManager.handleCollisions(ball, gameObjects);
 
-            // 壁との反射チェック
-            GameLogic.handleWallCollision(ball, getWidth(), getHeight());
+                // 壁との反射チェック
+                GameLogic.handleWallCollision(ball, getWidth(), getHeight());
 
-            // === ゲームクリア判定 ===
-            if (GameLogic.isGameCleared(gameObjects)) {
-                timer.stop();
-                stateManager.transitionTo(GameState.CLEAR); // ←追加検討
-                layout.show(parent, "Clear");
-            }
-
-            // ゲームオーバー判定：画面の下に出たら終了
-            if (ball.getY() >= getHeight()) {
-                timer.stop(); // ゲーム停止
-                stateManager.transitionTo(GameState.GAMEOVER);
-                String[] options = { "もう一度(Enter)", "終了(ESC)" };
-                int option = JOptionPane.showOptionDialog(
-                        this, "ゲームオーバー\nもう一度？", "Game Over",
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.INFORMATION_MESSAGE,
-                        null,
-                        options,
-                        options[0]);
-
-                if (option == 0) {
-                    resetGame(); // 初期化（ボール位置やブロック再配置など）
-
-                    message = "Enterキーで再開します";
-                    stateManager.transitionTo(GameState.READY);
-                    repaint();
-
-                } else {
-                    System.exit(0); // 終了
+                // === ゲームクリア判定 ===
+                if (GameLogic.isGameCleared(gameObjects)) {
+                    timer.stop();
+                    // nullチェックしてからスコア更新＋画面遷移
+                    if (clearPanel != null) {
+                        clearPanel.updateScoreLabel();
+                        stateManager.transitionTo(GameState.CLEAR);
+                        layout.show(parent, "Clear");
+                    }
                 }
+
+                // ゲームオーバー判定：画面の下に出たら終了
+                if (ball.getY() >= getHeight()) {
+                    timer.stop(); // ゲーム停止
+                    stateManager.transitionTo(GameState.GAMEOVER);
+                    String[] options = { "もう一度(Enter)", "終了(ESC)" };
+                    int option = JOptionPane.showOptionDialog(
+                            this,
+                            "ゲームオーバー\nスコア: " + GameManager.getTotalScore() + "\nもう一度？",
+                            "Game Over",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.INFORMATION_MESSAGE,
+                            null,
+                            options,
+                            options[0]);
+
+                    if (option == 0) {
+                        GameManager.resetScore();
+                        resetGame(); // 初期化（ボール位置やブロック再配置など）
+                        message = "Enterキーで再開します";
+                        stateManager.transitionTo(GameState.READY);
+                        repaint();
+                    } else {
+                        GameManager.resetScore();
+                        System.exit(0); // 終了
+                    }
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace(); // コンソールに出力
             }
+
             repaint(); // 描画
         });
     }
 
     public void startGame() {
         resetGame();
-        stateManager.transitionTo(GameState.READY);
+        if (!stateManager.is(GameState.READY)) {
+            stateManager.transitionTo(GameState.READY);
+        }
         SwingUtilities.invokeLater(() -> requestFocusInWindow());
     }
 
@@ -117,10 +136,9 @@ public class GamePanel extends JPanel implements KeyListener {
         // 安全な位置（中央より下側）に置く
         ball = new Ball((double) INITIAL_BALL_X, (double) INITIAL_BALL_Y, initialBallSpeed);
         // スコア加算用のラムダ式を設定
-        ball.setScoreConsumer(points -> score += points);
         ball.setSpeedChangeListener(() -> showSpeedUpNotice());
+        ball.setScoreConsumer(score -> GameManager.addScore(score));
         paddle = new Paddle(160, 260, 400);
-        score = 0;
 
         gameObjects = new ArrayList<>();
         gameObjects.addAll(blocks);
@@ -129,7 +147,6 @@ public class GamePanel extends JPanel implements KeyListener {
 
         ball.resetBounceCount(); // ボールのバウンドカウントをリセット
 
-        stateManager.transitionTo(GameState.READY);
         message = "Enterキーで開始";
 
         repaint();
@@ -151,13 +168,17 @@ public class GamePanel extends JPanel implements KeyListener {
         timer.start();
     }
 
+    public void setClearPanel(ClearPanel clearPanel) {
+        this.clearPanel = clearPanel;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
         g.setColor(Color.YELLOW);
         g.setFont(new Font("SansSerif", Font.BOLD, 14));
-        g.drawString("SCORE: " + score, 20, 20);
+        g.drawString("SCORE: " + GameManager.getTotalScore(), 20, 20);
 
         if (stateManager.is(GameState.READY) || stateManager.is(GameState.GAMEOVER)) {
             g.setColor(Color.WHITE);

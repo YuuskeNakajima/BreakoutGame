@@ -18,6 +18,7 @@ public class Ball implements GameObject, Movable, Collidable {
 
     // Ball クラスに listener 登録機能
     private SpeedChangeListener speedChangeListener;
+    private double currentSpeed; //現在の速度
 
     @Override
     public void onCollision(GameObject other) {
@@ -27,7 +28,6 @@ public class Ball implements GameObject, Movable, Collidable {
             // 前の位置より下から上に衝突したときだけ反転
             if (dy > 0 && (ballRect.intersects(paddleRect) ||
                     (prevY + radius * 2 <= paddle.getY() && y + radius * 2 >= paddle.getY()))) {
-                // reverseY();
 
                 // パドル中央との相対距離（-1.0〜1.0の範囲）
                 double paddleCenter = paddle.getX() + paddle.getWidth() / 2.0;
@@ -48,7 +48,7 @@ public class Ball implements GameObject, Movable, Collidable {
                     angle = -angle; // 左から来て右に当たった → 左に返す
                 }
 
-                double speed = this.initialSpeed; // ← startGame から渡された値
+                double speed = this.currentSpeed;
                 dx = speed * Math.sin(angle);
                 dy = -speed * Math.cos(angle);
 
@@ -102,12 +102,12 @@ public class Ball implements GameObject, Movable, Collidable {
         x += dx;
         y += dy;
 
-        // ボール反射数に応じてスピードを増加（5の倍数、最大20回まで）
+        // ボール反射数に応じてスピードを増加（10の倍数、最大5回まで）
         int bounce = getBounceCount();
-        if (bounce > 0 && bounce % 5 == 0 && bounce <= 20) {
-            double multiplier = 1.0 + (bounce / 5) * 0.1; // 5回で+0.1ずつ → 最大1.4倍（超える場合も考慮）
-            if (multiplier > 1.2)
-                multiplier = 1.2; // 上限制限
+        if (bounce > 0 && bounce % 10 == 0 && bounce <= 50) {
+            double multiplier = 1.0 + (bounce / 5) * 0.2; // 10回で+0.1ずつ → 最大2倍（超える場合も考慮）
+            if (multiplier > 2)
+                multiplier = 2; // 上限制限
             normalizeSpeed(multiplier);
 
             if (speedChangeListener != null) {
@@ -136,6 +136,7 @@ public class Ball implements GameObject, Movable, Collidable {
         this.x = startX;
         this.y = startY;
         this.initialSpeed = speed;
+        this.currentSpeed = speed; //初期速度を現在の速度にセット
         this.dx = 0;
         this.dy = speed;
     }
@@ -161,8 +162,9 @@ public class Ball implements GameObject, Movable, Collidable {
     }
 
     private void normalizeSpeed(double multiplier) {
-        double speed = Math.sqrt(dx * dx + dy * dy);
         double targetSpeed = this.initialSpeed * multiplier;
+        this.currentSpeed = targetSpeed;// 現在の速度を記録
+        double speed = Math.sqrt(dx * dx + dy * dy);
 
         if (speed == 0)
             return;
