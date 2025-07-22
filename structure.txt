@@ -1,0 +1,93 @@
+tree /f | Out-File -Encoding utf8 structure.txt で出力
+フォルダー パスの一覧:  ボリューム Windows
+ボリューム シリアル番号は 929E-5314 です
+C:.
+│  README.md
+│  structure.txt
+│  
+├─.vscode
+│      settings.json
+│      
+├─bin
+│  └─breakout
+│      ├─game
+│      │      BreakoutGame.class
+│      │      CollisionManager.class
+│      │      GameInitializer.class
+│      │      GameLogic.class
+│      │      GameLoop.class
+│      │      GameManager.class
+│      │      GameState.class
+│      │      GameStateManager.class
+│      │      
+│      ├─interfaces
+│      │      Collidable.class
+│      │      GameObject.class
+│      │      Movable.class
+│      │      SpeedChangeListener.class
+│      │      
+│      ├─object
+│      │  ├─ball
+│      │  │      Ball.class
+│      │  │      BallCollider.class
+│      │  │      BallPhysics.class
+│      │  │      BallRenderer.class
+│      │  │      
+│      │  ├─block
+│      │  │      Block.class
+│      │  │      BlockManager.class
+│      │  │      
+│      │  └─paddle
+│      │          Paddle.class
+│      │          
+│      └─ui
+│              ClearPanel.class
+│              GamePanel.class
+│              GameRenderer.class
+│              GameUIManager.class
+│              InputHandler.class
+│              SpeedUpNotice.class
+│              TitlePanel.class
+│              
+├─lib
+└─src
+    └─breakout
+        ├─game
+        │      BreakoutGame.java
+        │      CollisionManager.java
+        │      GameInitializer.java
+        │      GameLogic.java
+        │      GameLoop.java
+        │      GameManager.java
+        │      GameState.java
+        │      GameStateManager.java
+        │      
+        ├─interfaces
+        │      Collidable.java
+        │      GameObject.java
+        │      Movable.java
+        │      SpeedChangeListener.java
+        │      
+        ├─object
+        │  ├─ball
+        │  │      Ball.java
+        │  │      BallCollider.java
+        │  │      BallPhysics.java
+        │  │      BallRenderer.java
+        │  │      
+        │  ├─block
+        │  │      Block.java
+        │  │      BlockManager.java
+        │  │      
+        │  └─paddle
+        │          Paddle.java
+        │          
+        └─ui
+                ClearPanel.java
+                GamePanel.java
+                GameRenderer.java
+                GameUIManager.java
+                InputHandler.java
+                SpeedUpNotice.java
+                TitlePanel.java
+                
