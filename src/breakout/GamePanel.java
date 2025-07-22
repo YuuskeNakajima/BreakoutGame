@@ -1,14 +1,9 @@
 package breakout;
 
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import java.awt.Graphics;
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.Dimension;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
@@ -17,22 +12,22 @@ import java.util.*;
 
 public class GamePanel extends JPanel implements KeyListener {
     private Ball ball;
-    private Timer timer;
     private Paddle paddle;
 
-    private static final int INITIAL_BALL_X = 180;
-    private static final int INITIAL_BALL_Y = 160;
-
-    private String message = null;
     private double initialBallSpeed = 5.0;
-    private JLabel speedUpLabel;
+    private String message;
 
     private CardLayout layout;
     private JPanel parent;
     private ClearPanel clearPanel;
 
     private GameStateManager stateManager = new GameStateManager();
-    private List<Block> blocks;
+    private GameLoop gameLoop;
+    private GameRenderer renderer = new GameRenderer();
+    private InputHandler inputHandler;
+    private SpeedUpNotice speedUpNotice;
+    private GameUIManager uiManager;
+
     private List<GameObject> gameObjects;
 
     public GamePanel(CardLayout layout, JPanel parent, ClearPanel clearPanel) {
@@ -47,73 +42,11 @@ public class GamePanel extends JPanel implements KeyListener {
         setFocusable(true);
         addKeyListener(this);
 
-        setupSpeedUpLabel();
+        this.inputHandler = new InputHandler(this);
+        this.speedUpNotice = new SpeedUpNotice(this);
+        this.uiManager = new GameUIManager(this);
 
-        timer = new Timer(16, e -> {
-            if (!stateManager.is(GameState.RUNNING)) {
-                return;
-            }
-
-            if (clearPanel != null) {
-                clearPanel.updateScoreLabel();
-            }
-
-            try {
-                // 移動
-                for (GameObject obj : gameObjects) {
-                    if (obj instanceof Movable m) {
-                        m.update();
-                    }
-                }
-                // 衝突判定
-                CollisionManager.handleCollisions(ball, gameObjects);
-
-                // 壁との反射チェック
-                GameLogic.handleWallCollision(ball, getWidth(), getHeight());
-
-                // === ゲームクリア判定 ===
-                if (GameLogic.isGameCleared(gameObjects)) {
-                    timer.stop();
-                    // nullチェックしてからスコア更新＋画面遷移
-                    if (clearPanel != null) {
-                        clearPanel.updateScoreLabel();
-                        stateManager.transitionTo(GameState.CLEAR);
-                        layout.show(parent, "Clear");
-                    }
-                }
-
-                // ゲームオーバー判定：画面の下に出たら終了
-                if (ball.getY() >= getHeight()) {
-                    timer.stop(); // ゲーム停止
-                    stateManager.transitionTo(GameState.GAMEOVER);
-                    String[] options = { "もう一度(Enter)", "終了(ESC)" };
-                    int option = JOptionPane.showOptionDialog(
-                            this,
-                            "ゲームオーバー\nスコア: " + GameManager.getTotalScore() + "\nもう一度？",
-                            "Game Over",
-                            JOptionPane.YES_NO_OPTION,
-                            JOptionPane.INFORMATION_MESSAGE,
-                            null,
-                            options,
-                            options[0]);
-
-                    if (option == 0) {
-                        GameManager.resetScore();
-                        resetGame(); // 初期化（ボール位置やブロック再配置など）
-                        message = "Enterキーで再開します";
-                        stateManager.transitionTo(GameState.READY);
-                        repaint();
-                    } else {
-                        GameManager.resetScore();
-                        System.exit(0); // 終了
-                    }
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace(); // コンソールに出力
-            }
-
-            repaint(); // 描画
-        });
+        gameLoop = new GameLoop(this); // ← GameLoopを初期化
     }
 
     public void startGame() {
@@ -130,42 +63,96 @@ public class GamePanel extends JPanel implements KeyListener {
     }
 
     public void resetGame() {
-        timer.stop();
-        blocks = new ArrayList<>(BlockManager.createStage(1));
+        gameLoop.stop(); // ← ゲームループを停止
         requestFocusInWindow();
-        // 安全な位置（中央より下側）に置く
-        ball = new Ball((double) INITIAL_BALL_X, (double) INITIAL_BALL_Y, initialBallSpeed);
-        // スコア加算用のラムダ式を設定
-        ball.setSpeedChangeListener(() -> showSpeedUpNotice());
-        ball.setScoreConsumer(score -> GameManager.addScore(score));
-        paddle = new Paddle(160, 260, 400);
+        gameObjects = GameInitializer.createObjects(this, initialBallSpeed);
 
-        gameObjects = new ArrayList<>();
-        gameObjects.addAll(blocks);
-        gameObjects.add(paddle);
-        gameObjects.add(ball);
+        // 生成済みのボールを取得
+        this.ball = gameObjects.stream()
+                .filter(obj -> obj instanceof Ball)
+                .map(obj -> (Ball) obj)
+                .findFirst()
+                .orElse(null);
+
+        if (ball != null) {
+            // スコア加算の処理をセット
+            ball.setScoreConsumer(points -> {
+                GameManager.addScore(points);
+                updateScore(); // UI更新
+            });
+            ball.resetBounceCount();
+        }
 
         ball.resetBounceCount(); // ボールのバウンドカウントをリセット
-
-        message = "Enterキーで開始";
-
+        setMessage("Enterキーで開始");
+        updateScore();
         repaint();
     }
 
-    private void setupSpeedUpLabel() {
-        speedUpLabel = new JLabel("スピードアップ！", SwingConstants.CENTER);
-        speedUpLabel.setForeground(Color.YELLOW);
-        speedUpLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
-        speedUpLabel.setVisible(false);
-        speedUpLabel.setBounds(100, 10, 200, 30);
-        this.add(speedUpLabel);
+    // ==== Getter類（GameLoopからアクセスするため） ====
+
+    public List<GameObject> getGameObjects() {
+        return gameObjects;
     }
 
+    public Ball getBall() {
+        return ball;
+    }
+
+    public GameStateManager getStateManager() {
+        return stateManager;
+    }
+
+    public ClearPanel getClearPanel() {
+        return clearPanel;
+    }
+
+    public CardLayout getLayoutCard() {
+        return layout;
+    }
+
+    public JPanel getParentPanel() {
+        return parent;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String msg) {
+        this.message = msg;
+        repaint(); // メッセージ変わったら再描画する
+    }
+
+    public void clearMessage() {
+        setMessage(null);
+    }
+
+    // スコア更新メソッド
+    public void updateScore() {
+        uiManager.updateScore(GameManager.getTotalScore());
+    }
+
+    public GameLoop getGameLoop() {
+        return gameLoop;
+    }
+
+    public Paddle getPaddle() {
+        return paddle;
+    }
+
+    public void setBall(Ball ball) {
+        this.ball = ball;
+    }
+
+    public void setPaddle(Paddle paddle) {
+        this.paddle = paddle;
+    }
+
+    // ========================
+
     public void showSpeedUpNotice() {
-        speedUpLabel.setVisible(true);
-        Timer timer = new Timer(1000, e -> speedUpLabel.setVisible(false));
-        timer.setRepeats(false);
-        timer.start();
+        speedUpNotice.show();
     }
 
     public void setClearPanel(ClearPanel clearPanel) {
@@ -175,82 +162,17 @@ public class GamePanel extends JPanel implements KeyListener {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-
-        g.setColor(Color.YELLOW);
-        g.setFont(new Font("SansSerif", Font.BOLD, 14));
-        g.drawString("SCORE: " + GameManager.getTotalScore(), 20, 20);
-
-        if (stateManager.is(GameState.READY) || stateManager.is(GameState.GAMEOVER)) {
-            g.setColor(Color.WHITE);
-            g.setFont(new Font("SansSerif", Font.BOLD, 16));
-            g.drawString(message, getWidth() / 2 - 60, getHeight() / 2);
-        }
-
-        for (GameObject obj : gameObjects) {
-            obj.draw(g);
-        }
-
-        g.setColor(Color.WHITE);
-
-        // ポーズ状態の表示
-        if (stateManager.is(GameState.PAUSE)) {
-            g.setFont(new Font("SansSerif", Font.BOLD, 20));
-            g.drawString("PAUSED", getWidth() / 2 - 40, getHeight() / 2);
-        } else {
-            g.setFont(new Font("SansSerif", Font.BOLD, 16));
-            g.drawString("P：PAUSE", getWidth() / 2 + 110, 20);
-        }
+        renderer.render(g, this);
     }
 
     @Override
     public void keyPressed(KeyEvent e) {
-        int key = e.getKeyCode();
-        boolean changed = false;
-
-        // Enterキーでゲームスタート
-        if (key == KeyEvent.VK_ENTER) {
-            if (stateManager.is(GameState.READY) || stateManager.is(GameState.GAMEOVER)) {
-                stateManager.transitionTo(GameState.RUNNING);
-                message = null;
-                timer.start();
-                return;
-            }
-        }
-        // ポーズ切り替え
-        if (stateManager.is(GameState.RUNNING) && key == KeyEvent.VK_P) {
-            stateManager.transitionTo(GameState.PAUSE);
-            changed = true;
-            return; // Pキー以外の入力は無視
-        } else if (key == KeyEvent.VK_P && stateManager.is(GameState.PAUSE)) {
-            stateManager.transitionTo(GameState.RUNNING);
-            changed = true;
-            return;
-        }
-        // 移動キー処理
-        if (stateManager.is(GameState.RUNNING)) {
-            if (key == KeyEvent.VK_LEFT) {
-                paddle.setMoveLeft(true);
-            } else if (key == KeyEvent.VK_RIGHT) {
-                paddle.setMoveRight(true);
-            }
-            if (changed) {
-                repaint(); // 表示を更新
-            }
-        }
+        inputHandler.handleKeyPressed(e);
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-        int key = e.getKeyCode();
-        if (stateManager.is(GameState.RUNNING)) {
-            if (key == KeyEvent.VK_LEFT) {
-                paddle.setMoveLeft(false);
-            } else if (key == KeyEvent.VK_RIGHT) {
-                paddle.setMoveRight(false);
-            }
-        } else {
-            return;
-        }
+        inputHandler.handleKeyReleased(e);
     }
 
     @Override
